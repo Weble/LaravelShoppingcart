@@ -237,6 +237,20 @@ class Cart
     }
 
     /**
+     * Get the content of the cart.
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    public function metadata()
+    {
+        if (is_null($this->session->get($this->instance))) {
+            return new Collection([]);
+        }
+
+        return $this->getMetadata();
+    }
+
+    /**
      * Get the number of items in the cart.
      *
      * @return int|float
@@ -251,39 +265,33 @@ class Cart
     /**
      * Get the total price of the items in the cart.
      *
-     * @param  int  $decimals
-     * @param  string  $decimalPoint
-     * @param  string  $thousandSeperator
-     * @return string
+     * @return Money
      */
-    public function total($decimals = null, $decimalPoint = null, $thousandSeperator = null)
+    public function total()
     {
         $content = $this->getContent();
 
         $total = $content->reduce(function ($total, CartItem $cartItem) {
-            return $total + ($cartItem->qty * $cartItem->priceTax);
-        }, 0);
+            return $total->add($cartItem->priceTax->multiply($cartItem->qty));
+        }, money(0, $this->currency));
 
-        return $this->numberFormat($total, $decimals, $decimalPoint, $thousandSeperator);
+        return $total;
     }
 
     /**
      * Get the total tax of the items in the cart.
      *
-     * @param  int  $decimals
-     * @param  string  $decimalPoint
-     * @param  string  $thousandSeperator
-     * @return float
+     * @return Money
      */
-    public function tax($decimals = null, $decimalPoint = null, $thousandSeperator = null)
+    public function tax()
     {
         $content = $this->getContent();
 
         $tax = $content->reduce(function ($tax, CartItem $cartItem) {
-            return $tax + ($cartItem->qty * $cartItem->tax);
-        }, 0);
+            return $tax->add($cartItem->tax->multiply($cartItem->qty));
+        }, money(0, $this->currency));
 
-        return $this->numberFormat($tax, $decimals, $decimalPoint, $thousandSeperator);
+        return $tax;
     }
 
     /**
@@ -629,29 +637,5 @@ class Cart
         $connection = config('cart.database.connection');
 
         return is_null($connection) ? config('database.default') : $connection;
-    }
-
-    /**
-     * Get the Formated number
-     *
-     * @param $value
-     * @param $decimals
-     * @param $decimalPoint
-     * @param $thousandSeperator
-     * @return string
-     */
-    private function numberFormat($value, $decimals, $decimalPoint, $thousandSeperator)
-    {
-        if (is_null($decimals)) {
-            $decimals = is_null(config('cart.format.decimals')) ? 2 : config('cart.format.decimals');
-        }
-        if (is_null($decimalPoint)) {
-            $decimalPoint = is_null(config('cart.format.decimal_point')) ? '.' : config('cart.format.decimal_point');
-        }
-        if (is_null($thousandSeperator)) {
-            $thousandSeperator = is_null(config('cart.format.thousand_seperator')) ? ',' : config('cart.format.thousand_seperator');
-        }
-
-        return number_format($value, $decimals, $decimalPoint, $thousandSeperator);
     }
 }

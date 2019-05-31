@@ -22,33 +22,33 @@ class CartItemTest extends TestCase
     /** @test */
     public function it_can_be_cast_to_an_array()
     {
-        $cartItem = new CartItem(1, 'Some item', 10.00, ['size' => 'XL', 'color' => 'red']);
+        $cartItem = new CartItem(1, 'Some item', money(10.0), ['size' => 'XL', 'color' => 'red']);
         $cartItem->setQuantity(2);
 
         $this->assertEquals([
             'id' => 1,
             'name' => 'Some item',
-            'price' => 10.00,
+            'price' => money(10)->toArray(),
             'rowId' => '07d5da5550494c62daf9993cf954303f',
             'qty' => 2,
             'options' => [
                 'size' => 'XL',
                 'color' => 'red'
             ],
-            'tax' => 0,
-            'subtotal' => 20.00,
+            'tax' => money(0)->toArray(),
+            'subtotal' => money(20.00)->toArray(),
         ], $cartItem->toArray());
     }
 
     /** @test */
     public function it_can_be_cast_to_json()
     {
-        $cartItem = new CartItem(1, 'Some item', 10.00, ['size' => 'XL', 'color' => 'red']);
+        $cartItem = new CartItem(1, 'Some item', money(10.00), ['size' => 'XL', 'color' => 'red']);
         $cartItem->setQuantity(2);
 
         $this->assertJson($cartItem->toJson());
 
-        $json = '{"rowId":"07d5da5550494c62daf9993cf954303f","id":1,"name":"Some item","qty":2,"price":10,"options":{"size":"XL","color":"red"},"tax":0,"subtotal":20}';
+        $json = json_encode($cartItem->toArray());
 
         $this->assertEquals($json, $cartItem->toJson());
     }

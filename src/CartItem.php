@@ -7,6 +7,14 @@ use Illuminate\Contracts\Support\Arrayable;
 use Weble\LaravelShoppingCart\Contracts\Buyable;
 use Illuminate\Contracts\Support\Jsonable;
 
+/**
+ * Class CartItem
+ * @package Weble\LaravelShoppingCart
+ *
+ * @property-read Money $tax
+ * @property-read Money $total
+ * @property-read Money $taxTotal
+ */
 class CartItem implements Arrayable, Jsonable
 {
     /**
@@ -326,10 +334,10 @@ class CartItem implements Arrayable, Jsonable
             'id'       => $this->id,
             'name'     => $this->name,
             'qty'      => $this->qty,
-            'price'    => $this->price,
+            'price'    => $this->price->toArray(),
             'options'  => $this->options->toArray(),
-            'tax'      => $this->tax,
-            'subtotal' => $this->subtotal
+            'tax'      => $this->tax->toArray(),
+            'subtotal' => $this->subtotal->toArray()
         ];
     }
 
