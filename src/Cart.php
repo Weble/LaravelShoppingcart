@@ -1,16 +1,16 @@
 <?php
 
-namespace Gloudemans\Shoppingcart;
+namespace Weble\LaravelShoppingCart;
 
 use Closure;
 use Illuminate\Support\Collection;
 use Illuminate\Session\SessionManager;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Contracts\Events\Dispatcher;
-use Gloudemans\Shoppingcart\Contracts\Buyable;
-use Gloudemans\Shoppingcart\Exceptions\UnknownModelException;
-use Gloudemans\Shoppingcart\Exceptions\InvalidRowIDException;
-use Gloudemans\Shoppingcart\Exceptions\CartAlreadyStoredException;
+use Weble\LaravelShoppingCart\Contracts\Buyable;
+use Weble\LaravelShoppingCart\Exceptions\UnknownModelException;
+use Weble\LaravelShoppingCart\Exceptions\InvalidRowIDException;
+use Weble\LaravelShoppingCart\Exceptions\CartAlreadyStoredException;
 
 class Cart
 {
@@ -55,7 +55,7 @@ class Cart
      * Set the current cart instance.
      *
      * @param string|null $instance
-     * @return \Gloudemans\Shoppingcart\Cart
+     * @return \Weble\LaravelShoppingCart\Cart
      */
     public function instance($instance = null)
     {
@@ -84,7 +84,7 @@ class Cart
      * @param int|float $qty
      * @param float     $price
      * @param array     $options
-     * @return \Gloudemans\Shoppingcart\CartItem
+     * @return \Weble\LaravelShoppingCart\CartItem
      */
     public function add($id, $name = null, $qty = null, $price = null, array $options = [])
     {
@@ -116,7 +116,7 @@ class Cart
      *
      * @param string $rowId
      * @param mixed  $qty
-     * @return \Gloudemans\Shoppingcart\CartItem
+     * @return \Weble\LaravelShoppingCart\CartItem
      */
     public function update($rowId, $qty)
     {
@@ -178,7 +178,7 @@ class Cart
      * Get a cart item from the cart by its rowId.
      *
      * @param string $rowId
-     * @return \Gloudemans\Shoppingcart\CartItem
+     * @return \Weble\LaravelShoppingCart\CartItem
      */
     public function get($rowId)
     {
@@ -445,7 +445,7 @@ class Cart
      * @param int|float $qty
      * @param float     $price
      * @param array     $options
-     * @return \Gloudemans\Shoppingcart\CartItem
+     * @return \Weble\LaravelShoppingCart\CartItem
      */
     private function createCartItem($id, $name, $qty, $price, array $options)
     {

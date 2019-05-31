@@ -1,12 +1,12 @@
 <?php
 
-namespace Gloudemans\Shoppingcart;
+namespace Weble\LaravelShoppingCart;
 
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Session\SessionManager;
 use Illuminate\Support\ServiceProvider;
 
-class ShoppingcartServiceProvider extends ServiceProvider
+class ShoppingCartServiceProvider extends ServiceProvider
 {
 
     /**
@@ -16,7 +16,7 @@ class ShoppingcartServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $this->app->bind('cart', 'Gloudemans\Shoppingcart\Cart');
+        $this->app->bind('cart', 'Weble\LaravelShoppingCart\Cart');
 
         $config = __DIR__ . '/../config/cart.php';
         $this->mergeConfigFrom($config, 'cart');

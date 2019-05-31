@@ -3,8 +3,8 @@
 namespace Gloudemans\Tests\Shoppingcart;
 
 use Orchestra\Testbench\TestCase;
-use Gloudemans\Shoppingcart\CartItem;
-use Gloudemans\Shoppingcart\ShoppingcartServiceProvider;
+use Weble\LaravelShoppingCart\CartItem;
+use Weble\LaravelShoppingCart\ShoppingCartServiceProvider;
 
 class CartItemTest extends TestCase
 {
@@ -16,7 +16,7 @@ class CartItemTest extends TestCase
      */
     protected function getPackageProviders($app)
     {
-        return [ShoppingcartServiceProvider::class];
+        return [ShoppingCartServiceProvider::class];
     }
 
     /** @test */
