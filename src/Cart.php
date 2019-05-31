@@ -2,15 +2,16 @@
 
 namespace Weble\LaravelShoppingCart;
 
+use Cknow\Money\Money;
 use Closure;
-use Illuminate\Support\Collection;
-use Illuminate\Session\SessionManager;
-use Illuminate\Database\DatabaseManager;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Database\DatabaseManager;
+use Illuminate\Session\SessionManager;
+use Illuminate\Support\Collection;
+use Money\Currency;
 use Weble\LaravelShoppingCart\Contracts\Buyable;
-use Weble\LaravelShoppingCart\Exceptions\UnknownModelException;
 use Weble\LaravelShoppingCart\Exceptions\InvalidRowIDException;
-use Weble\LaravelShoppingCart\Exceptions\CartAlreadyStoredException;
+use Weble\LaravelShoppingCart\Exceptions\UnknownModelException;
 
 class Cart
 {
@@ -25,7 +26,7 @@ class Cart
 
     /**
      * Instance of the event dispatcher.
-     * 
+     *
      * @var \Illuminate\Contracts\Events\Dispatcher
      */
     private $events;
@@ -37,11 +38,14 @@ class Cart
      */
     private $instance;
 
+    /** @var Currency $currency */
+    protected $currency;
+
     /**
      * Cart constructor.
      *
-     * @param \Illuminate\Session\SessionManager      $session
-     * @param \Illuminate\Contracts\Events\Dispatcher $events
+     * @param  \Illuminate\Session\SessionManager  $session
+     * @param  \Illuminate\Contracts\Events\Dispatcher  $events
      */
     public function __construct(SessionManager $session, Dispatcher $events)
     {
@@ -51,10 +55,15 @@ class Cart
         $this->instance(self::DEFAULT_INSTANCE);
     }
 
+    public function setCurrency(Currency $currency)
+    {
+        $this->currency = $currency;
+    }
+
     /**
      * Set the current cart instance.
      *
-     * @param string|null $instance
+     * @param  string|null  $instance
      * @return \Weble\LaravelShoppingCart\Cart
      */
     public function instance($instance = null)
@@ -77,13 +86,25 @@ class Cart
     }
 
     /**
+     * @param $key
+     * @param $value
+     */
+    public function addMetadata($key, $value)
+    {
+        $metadata = $this->getMetadata();
+        $metadata->put($key, $value);
+
+        $this->setMetadata($metadata);
+    }
+
+    /**
      * Add an item to the cart.
      *
-     * @param mixed     $id
-     * @param mixed     $name
-     * @param int|float $qty
-     * @param float     $price
-     * @param array     $options
+     * @param  mixed  $id
+     * @param  mixed  $name
+     * @param  int|float  $qty
+     * @param  float  $price
+     * @param  array  $options
      * @return \Weble\LaravelShoppingCart\CartItem
      */
     public function add($id, $name = null, $qty = null, $price = null, array $options = [])
@@ -103,10 +124,10 @@ class Cart
         }
 
         $content->put($cartItem->rowId, $cartItem);
-        
-        $this->events->fire('cart.added', $cartItem);
 
-        $this->session->put($this->instance, $content);
+        $this->events->dispatch('cart.added', $cartItem);
+
+        $this->setContent($content);
 
         return $cartItem;
     }
@@ -114,8 +135,8 @@ class Cart
     /**
      * Update the cart item with the given rowId.
      *
-     * @param string $rowId
-     * @param mixed  $qty
+     * @param  string  $rowId
+     * @param  mixed  $qty
      * @return \Weble\LaravelShoppingCart\CartItem
      */
     public function update($rowId, $qty)
@@ -148,9 +169,9 @@ class Cart
             $content->put($cartItem->rowId, $cartItem);
         }
 
-        $this->events->fire('cart.updated', $cartItem);
+        $this->events->dispatch('cart.updated', $cartItem);
 
-        $this->session->put($this->instance, $content);
+        $this->setContent($content);
 
         return $cartItem;
     }
@@ -158,7 +179,7 @@ class Cart
     /**
      * Remove the cart item with the given rowId from the cart.
      *
-     * @param string $rowId
+     * @param  string  $rowId
      * @return void
      */
     public function remove($rowId)
@@ -169,23 +190,24 @@ class Cart
 
         $content->pull($cartItem->rowId);
 
-        $this->events->fire('cart.removed', $cartItem);
+        $this->events->dispatch('cart.removed', $cartItem);
 
-        $this->session->put($this->instance, $content);
+        $this->setContent($content);
     }
 
     /**
      * Get a cart item from the cart by its rowId.
      *
-     * @param string $rowId
+     * @param  string  $rowId
      * @return \Weble\LaravelShoppingCart\CartItem
      */
     public function get($rowId)
     {
         $content = $this->getContent();
 
-        if ( ! $content->has($rowId))
+        if (!$content->has($rowId)) {
             throw new InvalidRowIDException("The cart does not contain rowId {$rowId}.");
+        }
 
         return $content->get($rowId);
     }
@@ -211,7 +233,7 @@ class Cart
             return new Collection([]);
         }
 
-        return $this->session->get($this->instance);
+        return $this->getContent();
     }
 
     /**
@@ -229,9 +251,9 @@ class Cart
     /**
      * Get the total price of the items in the cart.
      *
-     * @param int    $decimals
-     * @param string $decimalPoint
-     * @param string $thousandSeperator
+     * @param  int  $decimals
+     * @param  string  $decimalPoint
+     * @param  string  $thousandSeperator
      * @return string
      */
     public function total($decimals = null, $decimalPoint = null, $thousandSeperator = null)
@@ -248,9 +270,9 @@ class Cart
     /**
      * Get the total tax of the items in the cart.
      *
-     * @param int    $decimals
-     * @param string $decimalPoint
-     * @param string $thousandSeperator
+     * @param  int  $decimals
+     * @param  string  $decimalPoint
+     * @param  string  $thousandSeperator
      * @return float
      */
     public function tax($decimals = null, $decimalPoint = null, $thousandSeperator = null)
@@ -267,26 +289,26 @@ class Cart
     /**
      * Get the subtotal (total - tax) of the items in the cart.
      *
-     * @param int    $decimals
-     * @param string $decimalPoint
-     * @param string $thousandSeperator
-     * @return float
+     * @return Money
      */
-    public function subtotal($decimals = null, $decimalPoint = null, $thousandSeperator = null)
+    public function subtotal()
     {
         $content = $this->getContent();
 
         $subTotal = $content->reduce(function ($subTotal, CartItem $cartItem) {
-            return $subTotal + ($cartItem->qty * $cartItem->price);
-        }, 0);
+            return Money::sum(
+                $subTotal,
+                $cartItem->price->multiply($cartItem->qty)
+            );
+        }, \money(0, $this->currency ? $this->currency->getCode() : null));
 
-        return $this->numberFormat($subTotal, $decimals, $decimalPoint, $thousandSeperator);
+        return $subTotal;
     }
 
     /**
      * Search the cart content for a cart item matching the given search closure.
      *
-     * @param \Closure $search
+     * @param  \Closure  $search
      * @return \Illuminate\Support\Collection
      */
     public function search(Closure $search)
@@ -299,13 +321,13 @@ class Cart
     /**
      * Associate the cart item with the given rowId with the given model.
      *
-     * @param string $rowId
-     * @param mixed  $model
+     * @param  string  $rowId
+     * @param  mixed  $model
      * @return void
      */
     public function associate($rowId, $model)
     {
-        if(is_string($model) && ! class_exists($model)) {
+        if (is_string($model) && !class_exists($model)) {
             throw new UnknownModelException("The supplied model {$model} does not exist.");
         }
 
@@ -317,14 +339,24 @@ class Cart
 
         $content->put($cartItem->rowId, $cartItem);
 
-        $this->session->put($this->instance, $content);
+        $this->setContent($content);
+    }
+
+    public function setContent($content)
+    {
+        $this->session->put($this->instance, ['content' => $content, 'metadata' => $this->getMetadata()]);
+    }
+
+    public function setMetadata($metadata)
+    {
+        $this->session->put($this->instance, ['content' => $this->getContent(), 'metadata' => $metadata]);
     }
 
     /**
      * Set the tax rate for the cart item with the given rowId.
      *
-     * @param string    $rowId
-     * @param int|float $taxRate
+     * @param  string  $rowId
+     * @param  int|float  $taxRate
      * @return void
      */
     public function setTax($rowId, $taxRate)
@@ -337,48 +369,84 @@ class Cart
 
         $content->put($cartItem->rowId, $cartItem);
 
-        $this->session->put($this->instance, $content);
+        $this->setContent($content);
     }
 
     /**
      * Store an the current instance of the cart.
      *
-     * @param mixed $identifier
+     * @param  mixed  $identifier
      * @return void
      */
     public function store($identifier)
     {
         $content = $this->getContent();
+        $metadata = $this->getMetadata();
 
         if ($this->storedCartWithIdentifierExists($identifier)) {
-            throw new CartAlreadyStoredException("A cart with identifier {$identifier} was already stored.");
+            $this->sync($identifier);
+            return;
         }
 
         $this->getConnection()->table($this->getTableName())->insert([
             'identifier' => $identifier,
             'instance' => $this->currentInstance(),
-            'content' => serialize($content)
+            'content' => serialize($content),
+            'metadata' => serialize($metadata),
         ]);
 
-        $this->events->fire('cart.stored');
+        $this->events->dispatch('cart.stored');
+    }
+
+    /**
+     * update an the current instance of the cart.
+     *
+     * @param  mixed  $identifier
+     * @return void
+     */
+    public function sync($identifier)
+    {
+        if (!$this->storedCartWithIdentifierExists($identifier)) {
+            $this->store($identifier);
+            return;
+        }
+        $content = $this->getContent();
+        $metadata = $this->getMetadata();
+
+        $this->getConnection()->table($this->getTableName())
+            ->where([
+                'identifier' => $identifier,
+                'instance' => $this->currentInstance(),
+            ])
+            ->update([
+                'identifier' => $identifier,
+                'instance' => $this->currentInstance(),
+                'content' => serialize($content),
+                'metadata' => serialize($metadata),
+            ]);
+
+        $this->events->dispatch('cart.updated');
     }
 
     /**
      * Restore the cart with the given identifier.
      *
-     * @param mixed $identifier
+     * @param  mixed  $identifier
      * @return void
      */
-    public function restore($identifier)
+    public function restore($identifier, $instance = self::DEFAULT_INSTANCE)
     {
-        if( ! $this->storedCartWithIdentifierExists($identifier)) {
+        if (!$this->storedCartWithIdentifierExists($identifier)) {
             return;
         }
 
         $stored = $this->getConnection()->table($this->getTableName())
-            ->where('identifier', $identifier)->first();
+            ->where('identifier', $identifier)
+            ->where('instance', $instance)
+            ->first();
 
         $storedContent = unserialize($stored->content);
+        $storedMetadata = unserialize($stored->metadata);
 
         $currentInstance = $this->currentInstance();
 
@@ -390,33 +458,52 @@ class Cart
             $content->put($cartItem->rowId, $cartItem);
         }
 
-        $this->events->fire('cart.restored');
+        $metadata = $this->getMetadata();
+        foreach ($storedMetadata as $key => $meta) {
+            $metadata->put($key, $meta);
+        }
 
-        $this->session->put($this->instance, $content);
+        $this->events->dispatch('cart.restored');
+
+        $this->session->put($this->instance, ['content' => $content, 'metadata' => $this->getMetadata()]);
 
         $this->instance($currentInstance);
+    }
 
-        $this->getConnection()->table($this->getTableName())
-            ->where('identifier', $identifier)->delete();
+    public function removeFromStore($identifier, $instance = self::DEFAULT_INSTANCE)
+    {
+        $this->getConnection()
+            ->table($this->getTableName())
+            ->where('identifier', $identifier)
+            ->where('instance', $instance)
+            ->delete();
+    }
+
+    public function removeAllFromStore($identifier)
+    {
+        $this->getConnection()
+            ->table($this->getTableName())
+            ->where('identifier', $identifier)
+            ->delete();
     }
 
     /**
      * Magic method to make accessing the total, tax and subtotal properties possible.
      *
-     * @param string $attribute
+     * @param  string  $attribute
      * @return float|null
      */
     public function __get($attribute)
     {
-        if($attribute === 'total') {
+        if ($attribute === 'total') {
             return $this->total();
         }
 
-        if($attribute === 'tax') {
+        if ($attribute === 'tax') {
             return $this->tax();
         }
 
-        if($attribute === 'subtotal') {
+        if ($attribute === 'subtotal') {
             return $this->subtotal();
         }
 
@@ -430,21 +517,41 @@ class Cart
      */
     protected function getContent()
     {
+        return collect($this->getCartData()->get('content', []));
+    }
+
+    /**
+     * Get the carts content, if there is no cart content set yet, return a new empty Collection
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    protected function getMetadata()
+    {
+        return collect($this->getCartData()->get('metadata', []));
+    }
+
+    /**
+     * Get the carts content, if there is no cart content set yet, return a new empty Collection
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    protected function getCartData()
+    {
         $content = $this->session->has($this->instance)
             ? $this->session->get($this->instance)
-            : new Collection;
+            : [];
 
-        return $content;
+        return collect($content);
     }
 
     /**
      * Create a new CartItem from the supplied attributes.
      *
-     * @param mixed     $id
-     * @param mixed     $name
-     * @param int|float $qty
-     * @param float     $price
-     * @param array     $options
+     * @param  mixed  $id
+     * @param  mixed  $name
+     * @param  int|float  $qty
+     * @param  float  $price
+     * @param  array  $options
      * @return \Weble\LaravelShoppingCart\CartItem
      */
     private function createCartItem($id, $name, $qty, $price, array $options)
@@ -469,12 +576,14 @@ class Cart
     /**
      * Check if the item is a multidimensional array or an array of Buyables.
      *
-     * @param mixed $item
+     * @param  mixed  $item
      * @return bool
      */
     private function isMulti($item)
     {
-        if ( ! is_array($item)) return false;
+        if (!is_array($item)) {
+            return false;
+        }
 
         return is_array(head($item)) || head($item) instanceof Buyable;
     }
@@ -533,13 +642,13 @@ class Cart
      */
     private function numberFormat($value, $decimals, $decimalPoint, $thousandSeperator)
     {
-        if(is_null($decimals)){
+        if (is_null($decimals)) {
             $decimals = is_null(config('cart.format.decimals')) ? 2 : config('cart.format.decimals');
         }
-        if(is_null($decimalPoint)){
+        if (is_null($decimalPoint)) {
             $decimalPoint = is_null(config('cart.format.decimal_point')) ? '.' : config('cart.format.decimal_point');
         }
-        if(is_null($thousandSeperator)){
+        if (is_null($thousandSeperator)) {
             $thousandSeperator = is_null(config('cart.format.thousand_seperator')) ? ',' : config('cart.format.thousand_seperator');
         }
 

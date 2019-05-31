@@ -2,6 +2,7 @@
 
 namespace Weble\LaravelShoppingCart;
 
+use Cknow\Money\Money;
 use Illuminate\Contracts\Support\Arrayable;
 use Weble\LaravelShoppingCart\Contracts\Buyable;
 use Illuminate\Contracts\Support\Jsonable;
@@ -39,7 +40,7 @@ class CartItem implements Arrayable, Jsonable
     /**
      * The price without TAX of the cart item.
      *
-     * @var float
+     * @var Money
      */
     public $price;
 
@@ -69,10 +70,10 @@ class CartItem implements Arrayable, Jsonable
      *
      * @param int|string $id
      * @param string     $name
-     * @param float      $price
+     * @param Money      $price
      * @param array      $options
      */
-    public function __construct($id, $name, $price, array $options = [])
+    public function __construct($id, $name, Money $price, array $options = [])
     {
         if(empty($id)) {
             throw new \InvalidArgumentException('Please supply a valid identifier.');
@@ -80,95 +81,74 @@ class CartItem implements Arrayable, Jsonable
         if(empty($name)) {
             throw new \InvalidArgumentException('Please supply a valid name.');
         }
-        if(strlen($price) < 0 || ! is_numeric($price)) {
-            throw new \InvalidArgumentException('Please supply a valid price.');
-        }
 
         $this->id       = $id;
         $this->name     = $name;
-        $this->price    = floatval($price);
+        $this->price    = $price;
         $this->options  = new CartItemOptions($options);
         $this->rowId = $this->generateRowId($id, $options);
     }
 
     /**
-     * Returns the formatted price without TAX.
-     *
-     * @param int    $decimals
-     * @param string $decimalPoint
-     * @param string $thousandSeperator
-     * @return string
+     * Returns the price without TAX.
+
+     * @return Money
      */
-    public function price($decimals = null, $decimalPoint = null, $thousandSeperator = null)
+    public function price()
     {
-        return $this->numberFormat($this->price, $decimals, $decimalPoint, $thousandSeperator);
+        return $this->price;
     }
     
     /**
      * Returns the formatted price with TAX.
-     *
-     * @param int    $decimals
-     * @param string $decimalPoint
-     * @param string $thousandSeperator
-     * @return string
+
+     * @return Money
      */
-    public function priceTax($decimals = null, $decimalPoint = null, $thousandSeperator = null)
+    public function priceTax()
     {
-        return $this->numberFormat($this->priceTax, $decimals, $decimalPoint, $thousandSeperator);
+        return $this->priceTax;
     }
 
     /**
      * Returns the formatted subtotal.
      * Subtotal is price for whole CartItem without TAX
      *
-     * @param int    $decimals
-     * @param string $decimalPoint
-     * @param string $thousandSeperator
-     * @return string
+     * @return Money
      */
-    public function subtotal($decimals = null, $decimalPoint = null, $thousandSeperator = null)
+    public function subtotal()
     {
-        return $this->numberFormat($this->subtotal, $decimals, $decimalPoint, $thousandSeperator);
+        return $this->subtotal;
     }
     
     /**
      * Returns the formatted total.
      * Total is price for whole CartItem with TAX
      *
-     * @param int    $decimals
-     * @param string $decimalPoint
-     * @param string $thousandSeperator
-     * @return string
+     * @return Money
      */
-    public function total($decimals = null, $decimalPoint = null, $thousandSeperator = null)
+    public function total()
     {
-        return $this->numberFormat($this->total, $decimals, $decimalPoint, $thousandSeperator);
+        return $this->total;
     }
 
     /**
      * Returns the formatted tax.
      *
-     * @param int    $decimals
-     * @param string $decimalPoint
-     * @param string $thousandSeperator
-     * @return string
+     * @return Money
      */
-    public function tax($decimals = null, $decimalPoint = null, $thousandSeperator = null)
+    public function tax()
     {
-        return $this->numberFormat($this->tax, $decimals, $decimalPoint, $thousandSeperator);
+        return $this->tax;
     }
     
     /**
      * Returns the formatted tax.
      *
-     * @param int    $decimals
-     * @param string $decimalPoint
-     * @param string $thousandSeperator
-     * @return string
+     * @return Money
      */
     public function taxTotal($decimals = null, $decimalPoint = null, $thousandSeperator = null)
     {
-        return $this->numberFormat($this->taxTotal, $decimals, $decimalPoint, $thousandSeperator);
+        return $this->taxTotal;
     }
 
     /**
@@ -195,7 +175,7 @@ class CartItem implements Arrayable, Jsonable
         $this->id       = $item->getBuyableIdentifier($this->options);
         $this->name     = $item->getBuyableDescription($this->options);
         $this->price    = $item->getBuyablePrice($this->options);
-        $this->priceTax = $this->price + $this->tax;
+        $this->priceTax = $this->price->add($this->tax);
     }
 
     /**
@@ -210,7 +190,7 @@ class CartItem implements Arrayable, Jsonable
         $this->qty      = array_get($attributes, 'qty', $this->qty);
         $this->name     = array_get($attributes, 'name', $this->name);
         $this->price    = array_get($attributes, 'price', $this->price);
-        $this->priceTax = $this->price + $this->tax;
+        $this->priceTax = $this->price->add($this->tax);
         $this->options  = new CartItemOptions(array_get($attributes, 'options', $this->options));
 
         $this->rowId = $this->generateRowId($this->id, $this->options->all());
@@ -255,23 +235,23 @@ class CartItem implements Arrayable, Jsonable
         }
 
         if($attribute === 'priceTax') {
-            return $this->price + $this->tax;
+            return $this->price->add($this->tax);
         }
         
         if($attribute === 'subtotal') {
-            return $this->qty * $this->price;
+            return $this->price->multiply($this->qty);
         }
         
         if($attribute === 'total') {
-            return $this->qty * ($this->priceTax);
+            return $this->priceTax->multiply($this->qty);
         }
 
         if($attribute === 'tax') {
-            return $this->price * ($this->taxRate / 100);
+            return $this->price->multiply($this->taxRate / 100);
         }
         
         if($attribute === 'taxTotal') {
-            return $this->tax * $this->qty;
+            return $this->tax->multiply($this->qty);
         }
 
         if($attribute === 'model' && isset($this->associatedModel)) {
